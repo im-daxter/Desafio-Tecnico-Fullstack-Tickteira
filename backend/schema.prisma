@@ -1,0 +1,107 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Enums para garantir a consistência dos estados do sistema
+
+enum PedidoStatus {
+  AGUARDANDO_PAGAMENTO
+  PAGO
+  CANCELADO
+  ESTORNADO
+}
+
+enum IngressoStatus {
+  VALIDO
+  INVALIDADO
+  UTILIZADO
+}
+
+enum EmailStatus {
+  PENDENTE
+  ENVIADO
+  FALHOU
+}
+
+// 1. SETOR
+// Define o limite rígido de ingressos por área do evento
+model Setor {
+  id              String     @id @default(uuid())
+  nome            String     // Ex: "Pista VIP", "Cadeira Inferior"
+  capacidadeTotal Int        // Ex: 400
+  pedidos         Pedido[]
+  ingressos       Ingresso[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+// 2. PEDIDO
+// Registra o pedido do comprador no site
+model Pedido {
+  id             String       @id @default(uuid())
+  reference      String       @unique // Código amigável do pedido, ex: "TKT-000412"
+  compradorNome  String
+  compradorEmail String
+  valorTotalCent Int          // Valor em centavos (24000 = R$ 240,00)
+  status         PedidoStatus @default(AGUARDANDO_PAGAMENTO)
+  
+  setorId        String
+  setor          Setor        @relation(fields: [setorId], references: [id])
+  
+  ingressos      Ingresso[]
+  logsEmail      LogEmail[]
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// 3. INGRESSO
+// Emitido apenas após o pagamento ser aprovado e processado no banco
+model Ingresso {
+  id        String         @id @default(uuid())
+  code      String         @unique @default(uuid()) // Hash/Código do QR Code
+  status    IngressoStatus @default(VALIDO)
+  
+  pedidoId  String
+  pedido    Pedido         @relation(fields: [pedidoId], references: [id])
+  
+  setorId   String
+  setor     Setor          @relation(fields: [setorId], references: [id])
+  
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+// 4. EVENTO WEBHOOK (Garantia de Idempotência)
+// Guarda o 'event_id' estável enviado pelo PagFácil para evitar reprocessamento
+model EventoWebhook {
+  id         String   @id @default(uuid())
+  eventId    String   @unique // Ex: "evt_9f2a3c1b" (Garante UNIQUE no banco)
+  eventType  String   // "payment.approved", "payment.refunded", etc.
+  payload    Json     // O corpo completo do JSON recebido
+  processado Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+// 5. LOG DE E-MAIL
+// Registra os disparos para que o suporte (João) identifique e reenvie falhas
+model LogEmail {
+  id             String      @id @default(uuid())
+  compradorEmail String
+  assunto        String
+  conteudo       String      @db.Text
+  status         EmailStatus @default(PENDENTE)
+  tentativas     Int         @default(0)
+  erroMensagem   String?     @db.Text
+  
+  pedidoId       String
+  pedido         Pedido      @relation(fields: [pedidoId], references: [id])
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
