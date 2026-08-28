@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # 1. Banco de Dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: tickteira_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: tickteira_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis para Filas (BullMQ) e Cache
+  redis:
+    image: redis:7-alpine
+    container_name: tickteira_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Backend (NestJS + API + Workers)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tickteira_backend
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/tickteira_db?schema=public"
+      REDIS_HOST: "redis"
+      REDIS_PORT: 6379
+      PAGFACIL_SECRET: "minha_chave_secreta_dev"
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 4. Migrations e Seed Automático (Atende ao requisito do teste)
+  prisma-setup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tickteira_prisma_setup
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/tickteira_db?schema=public"
+    # Executa a migração das tabelas e o seed antes da aplicação rodar
+    command: >
+      sh -c "npx prisma migrate deploy && npx ts-node prisma/seed.ts"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # 5. Frontend (Next.js - Tela do João)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tickteira_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:3000"
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
