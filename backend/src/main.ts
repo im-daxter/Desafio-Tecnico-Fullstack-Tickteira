@@ -9,7 +9,8 @@ async function bootstrap() {
   app.enableCors();
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
+  // NestJS aceitar conexoes do docker/maquina local
+  await app.listen(port, '0.0.0.0');
   console.log(`Backend rodando na porta ${port}`);
 }
 bootstrap();

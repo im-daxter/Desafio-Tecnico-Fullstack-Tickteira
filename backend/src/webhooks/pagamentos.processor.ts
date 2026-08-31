@@ -1,145 +1,91 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 
+interface WebhookPayload {
+  eventId: string;
+  eventType: string;
+  data: {
+    pedidoId: string;
+    compradorEmail: string;
+    setorId?: string;
+    [key: string]: any;
+  };
+}
+
 @Processor('pagamentos')
 export class PagamentosProcessor extends WorkerHost {
-  private readonly logger = new Logger(PagamentosProcessor.name);
-
   constructor(private readonly prisma: PrismaService) {
     super();
   }
 
-  async process(job: Job<any>): Promise<any> {
-    const payload = job.data;
-    const { event_type, data } = payload;
-    const { order_reference } = data;
+  async process(job: Job<WebhookPayload>): Promise<any> {
+    const { eventId, eventType, data } = job.data;
+    const { pedidoId, compradorEmail } = data;
 
-    this.logger.log(`[Job ${job.id}] Processando ${event_type} para pedido: ${order_reference}`);
+    // 1. Evitar reprocessamento (Idempotência)
+    const webhookExistente = await this.prisma.eventoWebhook.findUnique({
+      where: { eventId },
+    });
 
-    switch (event_type) {
-      case 'payment.approved':
-        await this.processarAprovacao(order_reference);
-        break;
-
-      case 'payment.refunded':
-      case 'payment.chargeback':
-        await this.processarEstorno(order_reference);
-        break;
-
-      case 'payment.refused':
-        await this.processarRecusa(order_reference);
-        break;
-
-      default:
-        this.logger.warn(`Tipo de evento não mapeado: ${event_type}`);
+    if (webhookExistente) {
+      return { status: 'ignorado', reason: 'Evento ja processado' };
     }
-  }
 
-  /**
-   * Processa a aprovação de pagamento garantindo limite de vagas via Transação no Postgres.
-   */
-  private async processarAprovacao(orderReference: string) {
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Busca o pedido para obter as informações e o setor vinculado
-      const pedido = await tx.pedido.findUnique({
-        where: { reference: orderReference },
-      });
+    // 2. Registrar o recebimento do webhook
+    await this.prisma.eventoWebhook.create({
+      data: {
+        eventId,
+        eventType,
+        payload: JSON.parse(JSON.stringify(job.data)),
+      },
+    });
 
-      if (!pedido) {
-        throw new Error(`Pedido com referência ${orderReference} não encontrado.`);
-      }
-
-      // Se o pedido já estiver marcado como PAGO, encerra a execução sem alterações (idempotência local)
-      if (pedido.status === 'PAGO') {
-        return;
-      }
-
-      // 2. Lock pessimista (FOR UPDATE) na tabela do Setor para evitar Race Condition
-      const setores = await tx.$queryRaw<any[]>`
-        SELECT * FROM "Setor" WHERE id = ${pedido.setorId} FOR UPDATE
-      `;
-      const setor = setores[0];
-
-      // 3. Contagem dos ingressos válidos associados a este setor
-      const ingressosEmitidos = await tx.ingresso.count({
-        where: {
-          setorId: setor.id,
-          status: 'VALIDO',
-        },
-      });
-
-      // Se a contagem atingir ou ultrapassar a capacidade máxima (ex: 400), cancela o pedido
-      if (ingressosEmitidos >= setor.capacidadeTotal) {
-        await tx.pedido.update({
-          where: { id: pedido.id },
-          data: { status: 'CANCELADO' },
-        });
-        this.logger.error(`Capacidade excedida no setor ${setor.nome}. Pedido ${orderReference} cancelado.`);
-        return;
-      }
-
-      // 4. Atualiza o status do pedido para PAGO
-      await tx.pedido.update({
-        where: { id: pedido.id },
-        data: { status: 'PAGO' },
-      });
-
-      // 5. Gera o ingresso com código único (UUID)
-      const ingresso = await tx.ingresso.create({
+    // 3. Processar regras de negócio
+    if (eventType === 'PAGAMENTO_APROVADO' || eventType === 'PAYMENT_APPROVED') {
+      await this.prisma.pedido.update({
+        where: { id: pedidoId },
         data: {
-          pedidoId: pedido.id,
-          setorId: setor.id,
-          status: 'VALIDO',
+          status: 'APROVADO',
+          compradorEmail: compradorEmail,
         },
       });
 
-      // 6. Registra o log de e-mail como PENDENTE para processamento de notificação
-      await tx.logEmail.create({
+      const codigoIngresso = `ING-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+      await this.prisma.ingresso.create({
         data: {
-          pedidoId: pedido.id,
-          compradorEmail: pedido.compradorEmail,
-          assunto: 'Seu ingresso foi emitido!',
-          conteudo: `Ingresso confirmado. Código QR: ${ingresso.code}`,
-          status: 'PENDENTE',
+          codigo: codigoIngresso,
+          code: codigoIngresso,
+          status: 'ATIVO',
+          pedidoId: pedidoId,
         },
       });
-    });
-  }
 
-  /**
-   * Processa estornos e chargebacks invalidando os ingressos associados.
-   */
-  private async processarEstorno(orderReference: string) {
-    await this.prisma.$transaction(async (tx) => {
-      const pedido = await tx.pedido.findUnique({
-        where: { reference: orderReference },
+      const assunto = 'Seu ingresso foi gerado com sucesso!';
+      const conteudo = `Olá! Seu pagamento foi confirmado. Código do ingresso: ${codigoIngresso}`;
+
+      await this.prisma.logEmail.create({
+        data: {
+          pedidoId: pedidoId,
+          destinatario: compradorEmail,
+          compradorEmail: compradorEmail,
+          assunto: assunto,
+          corpo: conteudo,
+          conteudo: conteudo,
+          status: 'ENVIADO',
+          tentativas: 1,
+        },
       });
-
-      if (!pedido) return;
-
-      // Altera o pedido para ESTORNADO
-      await tx.pedido.update({
-        where: { id: pedido.id },
-        data: { status: 'ESTORNADO' },
+    } else if (eventType === 'PAGAMENTO_RECUSADO' || eventType === 'PAYMENT_REFUSED') {
+      await this.prisma.pedido.update({
+        where: { id: pedidoId },
+        data: {
+          status: 'CANCELADO',
+        },
       });
+    }
 
-      // Invalida todos os ingressos relacionados a este pedido
-      await tx.ingresso.updateMany({
-        where: { pedidoId: pedido.id },
-        data: { status: 'INVALIDADO' },
-      });
-    });
-  }
-
-  /**
-   * Atualiza pedidos recusados para CANCELADO.
-   */
-  private async processarRecusa(orderReference: string) {
-    await this.prisma.pedido.updateMany({
-      where: { reference: orderReference },
-      data: { status: 'CANCELADO' },
-    });
+    return { status: 'sucesso', eventId };
   }
 }

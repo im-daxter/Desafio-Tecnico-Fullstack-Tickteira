@@ -1,0 +1,77 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Evento {
+  id        String   @id @default(uuid())
+  nome      String
+  data      DateTime
+  setores   Setor[]
+  createdAt DateTime @default(now())
+}
+
+model Setor {
+  id              String     @id @default(uuid())
+  nome            String
+  capacidadeTotal Int
+  precoCentavos   Int        @default(0)
+  eventoId        String
+  evento          Evento     @relation(fields: [eventoId], references: [id])
+  pedidos         Pedido[]
+  createdAt       DateTime   @default(now())
+}
+
+model Pedido {
+  id             String     @id @default(uuid())
+  reference      String?    @unique
+  setorId        String
+  setor          Setor      @relation(fields: [setorId], references: [id])
+  quantidade     Int
+  status         String     // PENDENTE, APROVADO, CANCELADO
+  emailCliente   String
+  compradorEmail String?
+  ingressos      Ingresso[]
+  logEmails      LogEmail[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model Ingresso {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  code      String?
+  status    String   @default("ATIVO")
+  setorId   String?
+  pedidoId  String
+  pedido    Pedido   @relation(fields: [pedidoId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model EventoWebhook {
+  id           String   @id @default(uuid())
+  eventId      String   @unique
+  eventType    String?
+  payload      Json?
+  processadoEm DateTime @default(now())
+}
+
+model LogEmail {
+  id           String   @id @default(uuid())
+  pedidoId     String?
+  pedido       Pedido?  @relation(fields: [pedidoId], references: [id])
+  destinatario String
+  compradorEmail String?
+  assunto      String
+  corpo        String
+  conteudo     String?
+  erroMensagem String?
+  status       String   // ENVIADO, ERRO
+  tentativas   Int      @default(0)
+  createdAt    DateTime @default(now())
+}
