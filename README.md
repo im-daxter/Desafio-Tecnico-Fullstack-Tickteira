@@ -32,7 +32,7 @@ Aplicação backend desenvolvida em **NestJS**, **Prisma ORM**, **PostgreSQL**, 
 
 1. **Clonar o repositório:**
 ```bash
-git clone
+git clone https://github.com/im-daxter/Desafio-Tecnico-Fullstack-Tickteira.git
 ```
 
 ```bash 
@@ -73,8 +73,6 @@ Para visualizar o processamento dos eventos e das filas em tempo real:
 ```bash
 docker compose logs -f backend
 ```
-
-## Principais Endpoints
 
 ## Visualizando o Banco de Dados (Opcional)
 
