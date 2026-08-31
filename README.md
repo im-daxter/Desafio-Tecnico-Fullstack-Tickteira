@@ -31,12 +31,13 @@ Aplicação backend desenvolvida em **NestJS**, **Prisma ORM**, **PostgreSQL**, 
 ### Passos para Inicialização
 
 1. **Clonar o repositório:**
-   ```bash
-   git clone
-   ```
-   ```bash 
-   cd tickteira
-   ```
+```bash
+git clone
+```
+
+```bash 
+cd tickteira
+```
 
 2. **Subir os containers Docker:**
 ```bash
