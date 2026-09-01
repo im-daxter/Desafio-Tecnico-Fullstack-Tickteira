@@ -62,13 +62,12 @@ docker compose exec backend npm run seed
 
 O projeto possui o arquivo **`docker-compose.yml`** que possui o serviço **`frontend`** mapeado na porta **`3001`**.
 
-  1. Acessar o Frontend:
+  * Acessar o Frontend:
     Abra o seu navegador e acesse:
     ```bash
     http://localhost:3001
     ```
-
-  2. Testar os Endpoints da API via Frontend:
+  * Testar os Endpoints da API via Frontend:
     A aplicação web consome as APIs do backend que roda em http://localhost:3000.
     Navegue pelas telas da aplicação para visualizar os eventos criados pelo seed (como o evento "Show de Lançamento") e simular a navegação de suporte/compra.
 
