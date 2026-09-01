@@ -58,19 +58,19 @@ docker compose exec backend npm run seed
 
 ## Testando a Aplicação
 
-1. Testar a tela do FrontEnd e Suporte
+1. **Testar a tela do FrontEnd e Suporte**
 
 O projeto possui o arquivo **`docker-compose.yml`** que possui o serviço **`frontend`** mapeado na porta **`3001`**.
 
   * Acessar o Frontend:
     Abra o seu navegador e acesse:
-    ```bash
-    http://localhost:3001
-    ```
-  * Testar os Endpoints da API via Frontend:
-    A aplicação web consome as APIs do backend que roda em http://localhost:3000.
-    Navegue pelas telas da aplicação para visualizar os eventos criados pelo seed (como o evento "Show de Lançamento") e simular a navegação de suporte/compra.
+  ```bash
+  http://localhost:3001
+  ```
 
+  * Testar os Endpoints da API via Frontend:
+    A aplicação web consome as APIs do backend que roda em **`http://localhost:3000`**.
+    Navegue pelas telas da aplicação para visualizar os eventos criados pelo seed (como o evento "Show de Lançamento") e simular a navegação de suporte/compra.
 
 2. **Simular os eventos de pagamentos (Webhoook)**
 
@@ -79,11 +79,11 @@ O projeto possui um script pronto em TypeScript para validar o recebimento de pa
 ```bash
 docker compose exec backend npm run test:webhook
 ```
-  1. O que acontece:
+  * O que acontece:
     O script simula a PagFacil enviando o evento **`payment.approved`**.
     O backend grava a transação, gera o lote de ingressos e envia a tarefa de e-mail para a fila do BullMQ.
 
-3. Acompanhar os Logs da Aplicação e Filas (BullMQ)
+3. **Acompanhar os Logs da Aplicação e Filas (BullMQ)**
 
 Para visualizar o processamento dos eventos e das filas em tempo real:
 
