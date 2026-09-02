@@ -69,6 +69,12 @@ docker compose exec backend npm run test:webhook
     O script simula a PagFacil enviando o evento **`payment.approved`**.
     O backend grava a transação, gera o lote de ingressos e envia a tarefa de e-mail para a fila do BullMQ.
 
+Também possui um script para simular um erro de pagamento, para ser acesso no painel frontend **`http://localhost:3001/suporte`**.
+
+```bash
+docker compose exec backend npm run test:email-failure
+```
+
 3. **Acompanhar os Logs da Aplicação e Filas (BullMQ)**
 
 Para visualizar o processamento dos eventos e das filas em tempo real:
