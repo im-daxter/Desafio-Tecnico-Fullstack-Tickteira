@@ -3,13 +3,14 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Ajuste o nome da tabela/campos conforme o seu schema.prisma se necessário
-  await prisma.emailLog.create({
+  await prisma.logEmail.create({
     data: {
-      recipient: 'comprador@email.com',
-      orderRef: 'TKT-000412',
-      status: 'FAILED',
-      errorMessage: 'SMTP Connection Timeout: Falha no servidor de e-mail.',
+      destinatario: 'comprador@email.com',
+      assunto: 'Seus ingressos para o Show de Lançamento',
+      corpo: 'Abaixo estão os detalhes do seu ingresso...',
+      status: 'ERRO',
+      erroMensagem: 'SMTP Connection Timeout: Falha no servidor de e-mail.',
+      tentativas: 1,
     },
   });
 
