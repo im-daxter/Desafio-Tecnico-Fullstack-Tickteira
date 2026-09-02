@@ -5,9 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EmailsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Lista todos os logs de e-mail para o suporte do João
-  async listarLogs() {
+  // Lista os logs que falharam para a tela do João
+  async findFailedEmails() {
     return this.prisma.logEmail.findMany({
+      where: { status: 'FALHA' }, // Ou 'FAILED' conforme o seu enum no schema.prisma
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
@@ -16,8 +17,8 @@ export class EmailsService {
     });
   }
 
-  // Permite que o João clique em "Reenviar"
-  async reenviarEmail(id: string) {
+  // Reseta o e-mail para PENDENTE para o worker tentar o envio novamente
+  async requeueEmail(id: string) {
     const log = await this.prisma.logEmail.findUnique({
       where: { id },
     });
@@ -26,7 +27,6 @@ export class EmailsService {
       throw new NotFoundException('Log de e-mail não encontrado.');
     }
 
-    // Reseta o status para PENDENTE para o worker tentar novamente
     return this.prisma.logEmail.update({
       where: { id },
       data: {

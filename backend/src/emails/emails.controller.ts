@@ -1,17 +1,17 @@
 import { Controller, Get, Post, Param } from '@nestjs/common';
 import { EmailsService } from './emails.service';
 
-@Controller('emails')
-export class EmailsController {
+@Controller('support')
+export class SupportEmailsController {
   constructor(private readonly emailsService: EmailsService) {}
 
-  @Get('logs')
-  async listarLogs() {
-    return this.emailsService.listarLogs();
+  @Get('failed-emails')
+  async getFailedEmails() {
+    return this.emailsService.findFailedEmails();
   }
 
-  @Post(':id/reenviar')
-  async reenviarEmail(@Param('id') id: string) {
-    return this.emailsService.reenviarEmail(id);
+  @Post('resend-email/:id')
+  async resendEmail(@Param('id') id: string) {
+    return this.emailsService.requeueEmail(id);
   }
 }

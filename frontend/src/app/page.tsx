@@ -20,11 +20,12 @@ export default function SuportePage() {
 
   const carregarLogs = async () => {
     try {
-      const res = await fetch(`${apiUrl}/emails/logs`);
+      const res = await fetch(`${apiUrl}/support/failed-emails`);
       const data = await res.json();
-      setLogs(data);
+      setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erro ao buscar logs de e-mail:', err);
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -32,7 +33,7 @@ export default function SuportePage() {
 
   useEffect(() => {
     carregarLogs();
-    const interval = setInterval(carregarLogs, 5000); // Atualiza automaticamente a cada 5s
+    const interval = setInterval(carregarLogs, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -70,39 +71,47 @@ export default function SuportePage() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-b hover:bg-gray-50 text-sm">
-                    <td className="p-3 text-gray-600">
-                      {new Date(log.createdAt).toLocaleString('pt-BR')}
-                    </td>
-                    <td className="p-3 font-medium text-gray-800">{log.compradorEmail}</td>
-                    <td className="p-3 text-gray-600">{log.assunto}</td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          log.status === 'ENVIADO'
-                            ? 'bg-green-100 text-green-800'
-                            : log.status === 'FALHOU'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {log.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-gray-600">{log.tentativas}</td>
-                    <td className="p-3">
-                      {log.status === 'FALHOU' && (
-                        <button
-                          onClick={() => handleReenviar(log.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition"
+                {Array.isArray(logs) && logs.length > 0 ? (
+                  logs.map((log) => (
+                    <tr key={log.id} className="border-b hover:bg-gray-50 text-sm">
+                      <td className="p-3 text-gray-600">
+                        {new Date(log.createdAt).toLocaleString('pt-BR')}
+                      </td>
+                      <td className="p-3 font-medium text-gray-800">{log.compradorEmail}</td>
+                      <td className="p-3 text-gray-600">{log.assunto}</td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            log.status === 'ENVIADO'
+                              ? 'bg-green-100 text-green-800'
+                              : log.status === 'FALHOU'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
                         >
-                          Reenviar
-                        </button>
-                      )}
+                          {log.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-gray-600">{log.tentativas}</td>
+                      <td className="p-3">
+                        {log.status === 'FALHOU' && (
+                          <button
+                            onClick={() => handleReenviar(log.id)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition"
+                          >
+                            Reenviar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="p-4 text-center text-gray-500">
+                      Nenhum registro encontrado ou falha ao carregar dados da API.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

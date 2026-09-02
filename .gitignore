@@ -1,4 +1,30 @@
+# Dependências
 node_modules/
-dist/
+.pnpm-store/
+
+# Builds do Next.js e NestJS
 .next/
+dist/
+build/
+out/
+
+# Arquivos de ambiente e chaves secretas
 .env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Docker e Banco de Dados Local (se houver dados persistidos em pasta)
+.pgdata/
+postgres-data/
+
+# Arquivos do sistema operacional / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
