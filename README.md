@@ -43,16 +43,19 @@ docker compose exec backend npm run seed
 
 O projeto possui o arquivo **`docker-compose.yml`** que possui o serviço **`frontend`** mapeado na porta **`3001`**.
 
-* Acessar o Frontend:
+* Acessar o Frontend Principal:
 Abra o seu navegador e acesse:
     
 ```bash
 http://localhost:3001
 ```
 
-* Testar os Endpoints da API via Frontend:
-A aplicação web consome as APIs do backend que roda em **`http://localhost:3000`**.
-Navegue pelas telas da aplicação para visualizar os eventos criados pelo seed (como o evento "Show de Lançamento") e simular a navegação de suporte/compra.
+* Acessar o FrontEnd de suporte (João):
+Acesse a rota dedicada para gestão e reenvio de e-mails com falha:
+
+```bash
+http://localhost:3001/suporte
+```
 
 2. **Simular os eventos de pagamentos (Webhoook)**
 
@@ -78,12 +81,13 @@ docker compose logs -f backend
 
 ### Portas e Acesso
 
-| **Serviços**  | **URL/Porta**               | **Descrição**                                  |
-| ------------- |:---------------------------:|:-----------------------------------------------|
-| Frontend      | **`http://localhost:3001`** | Interface web para navegação, compra e suporte |
-| Backend       | **`http://localhost:3000`** | Endpoints da API REST e recepção de Webhooks   |
-| PostgreSQL    | **`http://localhost:5432`** | Banco de dados relacional                      |
-| Redis         | **`http://localhost:6379`** | Cache e broker de mensagens                    |
+| **Serviços**       | **URL/Porta**                       | **Descrição**                                              |
+| ------------------ | :---------------------------------: | :--------------------------------------------------------- |
+| Frontend           | **`http://localhost:3001`**         | Interface web para navegação e compra                      |
+| Painel de Suporte  | **`http://localhost:3001/suporte`** | Painel para visualização e reenvio de e-mails com falha    |
+| Backend            | **`http://localhost:3000`**         | Endpoints da API REST e recepção de Webhooks               |
+| PostgreSQL         | **`http://localhost:5432`**         | Banco de dados relacional                                  |
+| Redis              | **`http://localhost:6379`**         | Cache e broker de mensagens                                |
 
 ---
 
@@ -103,6 +107,7 @@ docker compose logs -f backend
 1. **Recepção Síncrona**: O webhook da PagFacil atinge a rota **`POST /webhooks/pagfacil`**. A requisição valida o payload e verifica a existência do **`eventId`** no Redis/PostgreSQL.
 2. **Resposta Rápida**: Caso seja novo, o evento é registrado e um job é enfileirado no BullMQ. A API responde imediatamente **`200`** OK para o gateway.
 3. **Processamento Assíncrono (Worker)**: O Worker do BullMQ consome o job, reserva o ingresso no PostgreSQL dentro de uma transação ACID e enfileira a notificação.
+4. **Tratamento de Falhas e Suporte**: Caso ocorra erro irrecuperável no disparo do e-mail, a tentativa é registrada na tabela **`LogEmail`** (**`status: FALHA`**). O suporte pode visualizar os erros e acionar o reenvio manual via **`/support/resend-email/:id`** no Painel de Suporte.
 
 ```
 [Gateway PagFacil] ──(POST Webhook)──> [NestJS API] ──(Verifica Idempotência)
@@ -113,7 +118,10 @@ docker compose logs -f backend
 [Worker BullMQ] <──(Consome Job)── [Redis Broker]
        │
        ├──> [PostgreSQL] (Atualiza Pedido / Reserva Ingresso)
-       └──> [Serviço de Email] (Notifica Cliente)
+       └──> [Serviço de Email]
+                 │
+                 ├── (Sucesso) ──> Cliente Notificado
+                 └── (Falha)   ──> [LogEmail: FALHA] ──> [Painel de Suporte /suporte]        
 ```
 
 ---
@@ -143,7 +151,7 @@ docker compose logs -f backend
 
 * **Integração / E2E**: Script de simulação de webhook (**`npm run test:webhook`**) testando o ciclo de vida completo: aprovação, idempotência e estorno.
 
-* **O que ficou sem cobertura e por quê**: Testes de carga automatizados (k6) e testes unitários de componentes visuais do frontend não foram incluídos devido ao prazo de entrega, priorizando a solidez da lógica de negócio backend e resiliência da fila.
+* **Fluxo de Suporte**: Teste de ponta a ponta do recebimento de falhas de e-mail e reprocessamento/reenvio manual pela interface do frontend.
 
 ---
 
